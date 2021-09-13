@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: dmi-v-react-e2e-pipeline-run-
+spec:
+  serviceAccountName: build-bot
+  pipelineRef:
+    name: dmi-v-react-e2e-pipeline
+  params:
+    - name: source-repo
+      value: https://github.com/cloud-native-garage-method-cohort/dmi-vlasenko-react-e2e
+    - name: image-repo
+      value: quay.io/dmiv/dmi-v-react-e2e
+    - name: app-name
+      value: dmi-v-react-e2e
+  workspaces:
+    - name: pipeline-shared-data
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

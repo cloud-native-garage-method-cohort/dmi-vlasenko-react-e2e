@@ -1,0 +1,96 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: dmi-v-react-e2e-pipeline
+spec:
+  params:
+    - name: source-repo
+      type: string
+      description: Source code repository
+    - name: image-repo
+      type: string
+    - name: app-name
+      type: string
+      description: Application name
+  workspaces:
+    - name: pipeline-shared-data
+  tasks:
+    - name: clone-repository
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      params:
+        - name: url
+          value: "$(params.source-repo)"
+      workspaces:
+        - name: output
+          workspace: pipeline-shared-data
+    - name: run-tests
+      runAfter:
+        - clone-repository
+      taskRef:
+        name: npm
+      params:
+        - name: ARGS
+          value: 
+            - install-ci-test
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+    - name: build-and-push-image
+      runAfter:
+        - run-tests
+      taskRef:
+        kind: ClusterTask
+        name: buildah
+      params:
+        - name: IMAGE
+          value: "$(params.image-repo):$(tasks.clone-repository.results.commit)"
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+    - name: create-envorinment-config
+      runAfter:
+        - build-and-push-image
+      taskRef:
+        name: kustomize
+      params:
+        - name: app-name
+          value: "$(params.app-name)"
+        - name: app-namespace
+          value: "$(context.pipelineRun.namespace)"
+        - name: source-repo
+          value: "$(params.source-repo)"
+        - name: commit
+          value: "$(tasks.clone-repository.results.commit)"
+        - name: image-repo
+          value: "$(params.image-repo)"
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+    - name: try-to-deploy
+      runAfter:
+        - create-envorinment-config
+      taskRef:
+        name: try-to-deploy
+      params:
+        - name: app-name
+          value: "$(params.app-name)"
+        - name: app-namespace
+          value: "$(context.pipelineRun.namespace)"
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
+    - name: gitops
+      runAfter:
+        - try-to-deploy
+      taskRef:
+        name: commit-manifest
+      params:
+        - name: app-name
+          value: "$(params.app-name)"
+        - name: sha
+          value: "$(tasks.clone-repository.results.commit)"
+      workspaces:
+        - name: source
+          workspace: pipeline-shared-data
