@@ -33,7 +33,7 @@ spec:
       params:
         - name: ARGS
           value: 
-            - install-ci-test
+            - test -- --watchAll=false
       workspaces:
         - name: source
           workspace: pipeline-shared-data
